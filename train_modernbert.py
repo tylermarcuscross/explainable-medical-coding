@@ -205,7 +205,7 @@ def main(cfg: OmegaConf) -> None:
             preprocess_function,
             batched=True,
             batch_size=1000,
-            num_proc=8,  # Parallel processing
+            num_proc=8,  
             remove_columns=[
                 col for col in dataset[split].column_names if col != TEXT_COLUMN
             ],
@@ -295,7 +295,7 @@ def main(cfg: OmegaConf) -> None:
     # Use the efficient DataCollator that does dynamic padding
     data_collator = DataCollatorWithPadding(
         tokenizer=tokenizer,
-        padding="longest",  # Only pad to the longest sequence in each batch
+        padding="longest", 
     )
     # Initialize trainer with memory optimizations
     trainer = Trainer(
