@@ -1,0 +1,26 @@
+# @package _global_
+defaults:
+  - override /model: plm_icd_modern
+  - override /lr_scheduler: warmup_linear_decay
+  - override /optimizer: adamw
+  - override /callbacks: mean_average_precision
+  - override /data: mimiciv_icd9
+
+
+dataloader:
+  max_batch_size: 8
+  batch_size: 16
+
+optimizer:
+  configs:
+    lr: 5e-5
+    weight_decay: 0
+
+trainer:
+  threshold_tuning: true
+  epochs: 20
+  clip_grad_norm: 1
+
+# Test mode settings
+# test_mode: true
+# test_samples: 100

@@ -96,3 +96,5 @@ wandb/
 
 outputs/
 multirun/
+
+models/modernbert-base
