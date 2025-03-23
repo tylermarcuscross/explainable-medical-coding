@@ -17,12 +17,18 @@ author:
     note: |
       Final project submission for the UC Berkeley Master of Information and Data Science program, DATASCI 266: Natural Language Processing with Deep Learning
 abstract: |
-  Medical coding is a critical yet complex process that requires translating clinical documentation into standardized ICD-10 codes. Currently, healthcare providers rely on dedicated medical coders who manually review extensive clinical notes to assign appropriate codes from 150,000+ possible diagnostic and procedural codes. This project builds upon the work of @edin2024explainable with two key innovations: (1) replacing RoBERTa with ModernBERT [@warner2024modernbert] as the encoder to potentially improve performance through its enhanced context window, and (2) adding a LLM-powered reasoning layer that provides natural language explanations for code predictions, bridging the gap between model predictions and human validation. Using the MIMIC-IV dataset, we implement and evaluate this approach using standard metrics (precision, recall, F1) and explanation quality.
+  Medical coding—the assignment of standardized ICD-10 codes to clinical documentation—remains a labor-intensive process requiring expert manual review of extensive narratives against 150,000+ potential classifications. We present CLEM-ICD, an extension of the PLM-ICD framework that replaces RoBERTa with ModernBERT to leverage its 8192-token context window for improved automated medical coding. Our architectural enhancement preserves the multi-label classification paradigm while significantly expanding the model's capacity to process lengthy clinical text, capturing distant dependencies crucial for accurate code assignment. Experiments on the MIMIC-IV dataset demonstrate that CLEM-ICD achieves superior performance compared to previous approaches, as measured by precision, recall, and F1-score. This work addresses a critical bottleneck in healthcare administration through advanced NLP techniques, offering a scalable solution for reducing the cognitive burden of medical coding while maintaining diagnostic accuracy.
 keywords: 
+  - clinical natural language processing
+  - medical coding automation
+  - transformer models
+  - multi-label classification
+  - long-context language models
   - ModernBERT
-  - natural language processing
   - MIMIC-IV
   - ICD-10
+  - healthcare informatics
+  - biomedical text classification
 date: last-modified
 bibliography: bibliography.bib
 format:
