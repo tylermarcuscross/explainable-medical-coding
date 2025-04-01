@@ -205,15 +205,12 @@ def main(cfg: OmegaConf) -> None:
             preprocess_function,
             batched=True,
             batch_size=1000,
-            num_proc=8,  
+            num_proc=8,
             remove_columns=[
                 col for col in dataset[split].column_names if col != TEXT_COLUMN
             ],
             desc=f"Processing {split} split",
         )
-
-    # Use DataCollatorWithPadding for dynamic padding (more efficient)
-    data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
     # Define metrics function
     def compute_metrics(eval_pred):
@@ -295,7 +292,7 @@ def main(cfg: OmegaConf) -> None:
     # Use the efficient DataCollator that does dynamic padding
     data_collator = DataCollatorWithPadding(
         tokenizer=tokenizer,
-        padding="longest", 
+        padding="longest",
     )
     # Initialize trainer with memory optimizations
     trainer = Trainer(
