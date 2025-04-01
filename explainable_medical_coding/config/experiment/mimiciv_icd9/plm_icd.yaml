@@ -21,6 +21,9 @@ trainer:
   epochs: 20
   clip_grad_norm: 1
 
+data:
+  max_length: 8192
+
 # Test mode settings
-# test_mode: true
-# test_samples: 100
+test_mode: true
+test_samples: 500
