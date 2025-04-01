@@ -41,11 +41,7 @@ format:
       cite-style: authoryear
 ---
 
-Medical coding is a critical yet complex process in healthcare administration. The translation of clinical documentation into standardized ICD-10 codes is essential for healthcare reimbursement, clinical research, and public health statistics. Currently, healthcare providers rely on dedicated medical coders who manually review extensive clinical notes to assign appropriate codes from over 150,000 possible diagnostic and procedural codes, creating significant administrative overhead.
-
-For every $1 of revenue collected by a hospital, approximately $0.25 is spent on administrative tasks necessary to collect it. Non-doctor workers outnumber doctors in healthcare roughly 16 to 1, with medical coding representing a significant portion of this burden.
-
-This project aims to improve automated medical coding by leveraging ModernBERT's enhanced context window capabilities, potentially reducing the administrative burden while maintaining or improving coding accuracy.
+Medical coding is a critical yet complex process in healthcare administration. The translation of clinical documentation into standardized ICD-10 codes is essential for healthcare reimbursement, clinical research, and public health statistics. Currently, healthcare providers rely on dedicated medical coders who manually review extensive clinical notes to assign appropriate codes from over 150,000 possible diagnostic and procedural codes, creating significant administrative overhead [@tseng2018administrative]. Non-doctor workers outnumber doctors in healthcare roughly 16 to 1 [@kocher2011rethinking], with medical coding representing a significant portion of this burden.
 
 # Background
 
