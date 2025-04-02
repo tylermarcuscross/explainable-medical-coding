@@ -249,8 +249,8 @@ def main(cfg: OmegaConf) -> None:
     training_args = TrainingArguments(
         output_dir=str(final_model_dir),
         learning_rate=float(cfg.optimizer.configs.lr),
-        per_device_train_batch_size=2,
-        per_device_eval_batch_size=2,
+        per_device_train_batch_size=cfg.dataloader.max_batch_size,
+        per_device_eval_batch_size=cfg.dataloader.max_batch_size,
         num_train_epochs=num_epochs,
         save_strategy="steps" if test_mode else "epoch",
         eval_strategy="steps" if test_mode else "epoch",

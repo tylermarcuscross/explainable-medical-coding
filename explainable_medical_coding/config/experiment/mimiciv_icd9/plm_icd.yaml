@@ -8,8 +8,8 @@ defaults:
 
 
 dataloader:
-  max_batch_size: 2
-  batch_size: 2
+  max_batch_size: 32
+  batch_size: 32
 
 optimizer:
   configs:
@@ -25,5 +25,5 @@ data:
   max_length: 8192
 
 # # Test mode settings
-test_mode: true
-test_samples: 100
+# test_mode: true
+# test_samples: 500
