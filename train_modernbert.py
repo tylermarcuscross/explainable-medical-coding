@@ -264,6 +264,10 @@ def main(cfg: OmegaConf) -> None:
         optim="adamw_torch_fused" if torch.cuda.is_available() else "adamw_torch",
         report_to=["wandb"],
         run_name=run_id,
+        max_grad_norm=1.0,
+        weight_decay=float(cfg.optimizer.configs.weight_decay)
+        if hasattr(cfg.optimizer.configs, "weight_decay")
+        else 0.01,
     )
 
     # Use the efficient DataCollator that does dynamic padding
