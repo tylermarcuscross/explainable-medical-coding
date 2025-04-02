@@ -3,6 +3,7 @@ import logging
 import random
 import string
 from pathlib import Path
+import os
 
 import hydra
 import numpy as np
@@ -39,6 +40,7 @@ LOGGER.setLevel(logging.INFO)
 )
 def main(cfg: OmegaConf) -> None:
     if hasattr(cfg, "deterministic") and cfg.deterministic:
+        os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
         torch.backends.cudnn.benchmark = False
         torch.backends.cudnn.deterministic = True
         torch.use_deterministic_algorithms(True)
