@@ -24,6 +24,6 @@ trainer:
 data:
   max_length: 8192
 
-# Test mode settings
-test_mode: true
-test_samples: 500
+# # Test mode settings
+# test_mode: true
+# test_samples: 500
