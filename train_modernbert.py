@@ -249,8 +249,8 @@ def main(cfg: OmegaConf) -> None:
     training_args = TrainingArguments(
         output_dir=str(final_model_dir),
         learning_rate=float(cfg.optimizer.configs.lr),
-        per_device_train_batch_size=cfg.dataloader.max_batch_size,
-        per_device_eval_batch_size=cfg.dataloader.max_batch_size,
+        per_device_train_batch_size=2,
+        per_device_eval_batch_size=2,
         num_train_epochs=num_epochs,
         save_strategy="steps" if test_mode else "epoch",
         eval_strategy="steps" if test_mode else "epoch",
@@ -260,14 +260,11 @@ def main(cfg: OmegaConf) -> None:
         load_best_model_at_end=True,
         metric_for_best_model="macro_f1",
         greater_is_better=True,
-        fp16=torch.cuda.is_available(),
-        optim="adamw_torch_fused" if torch.cuda.is_available() else "adamw_torch",
+        bf16=True,
+        bf16_full_eval=True,
+        optim="adamw_torch",
         report_to=["wandb"],
         run_name=run_id,
-        max_grad_norm=1.0,
-        weight_decay=float(cfg.optimizer.configs.weight_decay)
-        if hasattr(cfg.optimizer.configs, "weight_decay")
-        else 0.01,
     )
 
     # Use the efficient DataCollator that does dynamic padding
@@ -282,7 +279,6 @@ def main(cfg: OmegaConf) -> None:
         args=training_args,
         train_dataset=tokenized_dataset["train"],
         eval_dataset=tokenized_dataset["validation"],
-        processing_class=tokenizer,
         data_collator=data_collator,
         compute_metrics=compute_metrics,
     )
