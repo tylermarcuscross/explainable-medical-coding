@@ -22,5 +22,5 @@ trainer:
   clip_grad_norm: 1
 
 # Test mode settings
-# test_mode: true
-# test_samples: 100
+test_mode: true
+test_samples: 100
