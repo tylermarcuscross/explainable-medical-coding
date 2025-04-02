@@ -1,30 +1,33 @@
-# ruff: noqa: E402
+import json
 import logging
+import random
+import string
 from pathlib import Path
-
-# load environment variables
-from dotenv import find_dotenv, load_dotenv
-
-load_dotenv(find_dotenv())
 
 import hydra
 import numpy as np
 import torch
 from datasets import load_dataset
+from dotenv import find_dotenv, load_dotenv
 from omegaconf import OmegaConf
 from sklearn.metrics import f1_score, precision_score, recall_score
 from transformers import (
-    AutoTokenizer,
     AutoModelForSequenceClassification,
+    AutoTokenizer,
+    DataCollatorWithPadding,
     Trainer,
     TrainingArguments,
-    DataCollatorWithPadding,
 )
-from explainable_medical_coding.utils.tensor import deterministic, set_gpu
-from explainable_medical_coding.utils.seed import set_seed
-from explainable_medical_coding.utils.settings import TEXT_COLUMN, TARGET_COLUMN
 
+# Load environment variables
+load_dotenv(find_dotenv())
 
+# Configure PyTorch Dynamo
+torch._dynamo.config.cache_size_limit = 128
+torch._dynamo.config.disable = True
+
+TEXT_COLUMN = "text"
+TARGET_COLUMN = "target"
 LOGGER = logging.getLogger(name=__file__)
 LOGGER.setLevel(logging.INFO)
 
@@ -35,11 +38,11 @@ LOGGER.setLevel(logging.INFO)
     config_name="config",
 )
 def main(cfg: OmegaConf) -> None:
-    # Basic setup
     if hasattr(cfg, "deterministic") and cfg.deterministic:
-        deterministic()
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+        torch.use_deterministic_algorithms(True)
 
-    # Check if we're running in test mode
     test_mode = cfg.get("test_mode", False)
     test_samples = cfg.get("test_samples", 100) if test_mode else None
 
@@ -47,12 +50,12 @@ def main(cfg: OmegaConf) -> None:
         LOGGER.info(f"RUNNING IN TEST MODE with {test_samples} samples per split")
 
     if hasattr(cfg, "seed"):
-        set_seed(cfg.seed)
+        torch.manual_seed(cfg.seed)
+        np.random.seed(cfg.seed)
 
-    device = set_gpu(cfg)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     LOGGER.info(f"Using device: {device}")
 
-    # Get column names from config
     diagnosis_column = (
         cfg.data.diagnosis_column
         if hasattr(cfg.data, "diagnosis_column")
@@ -73,11 +76,6 @@ def main(cfg: OmegaConf) -> None:
     LOGGER.info(f"Using target column: {target_col}")
     LOGGER.info(f"Using diagnosis column: {diagnosis_column}")
     LOGGER.info(f"Using procedure column: {procedure_column}")
-
-    # Set random seed for reproducibility
-    if hasattr(cfg, "seed"):
-        torch.manual_seed(cfg.seed)
-        np.random.seed(cfg.seed)
 
     # Load dataset - use streaming for initial processing if dataset is large
     dataset_path = Path(cfg.data.dataset_path)
@@ -154,21 +152,17 @@ def main(cfg: OmegaConf) -> None:
 
     dataset = filtered_dataset
 
-    # Define optimized preprocessing function with vectorized operations
     def preprocess_function(examples):
-        # Tokenize with padding='longest' for batch efficiency during training
         tokenized = tokenizer(
             examples[TEXT_COLUMN],
-            padding=False,  # We'll use DataCollator for dynamic padding which is more efficient
+            padding=False,
             truncation=True,
             max_length=max_length,
         )
 
-        # Process all examples in batch at once
         batch_size = len(examples[TEXT_COLUMN])
         labels = np.zeros((batch_size, len(all_codes)), dtype=np.float32)
 
-        # Process diagnosis codes
         if diagnosis_column in examples:
             for i, codes in enumerate(examples[diagnosis_column]):
                 if codes and isinstance(
@@ -181,10 +175,9 @@ def main(cfg: OmegaConf) -> None:
                     if indices:
                         labels[i, indices] = 1.0
 
-        # Process procedure codes
         if procedure_column in examples:
             for i, codes in enumerate(examples[procedure_column]):
-                if codes and isinstance(codes, list):  # Same explicit check
+                if codes and isinstance(codes, list):
                     # Get indices for all valid codes in one operation
                     indices = [
                         code_to_idx[code] for code in codes if code in code_to_idx
@@ -195,7 +188,6 @@ def main(cfg: OmegaConf) -> None:
         tokenized["labels"] = labels.tolist()
         return tokenized
 
-    # Use optimized mapping with better batching and progress tracking
     LOGGER.info("Preprocessing dataset...")
     tokenized_dataset = {}
 
@@ -242,51 +234,34 @@ def main(cfg: OmegaConf) -> None:
 
     # Enable gradient checkpointing to save memory (significant memory reduction)
     model.gradient_checkpointing_enable()
-
-    # Setup training arguments with memory optimizations
-    output_dir = Path(f"outputs/{cfg.model.name}")
-    if test_mode:
-        output_dir = Path(f"outputs/test_{cfg.model.name}")
-    output_dir.mkdir(parents=True, exist_ok=True)
-
     # Adjust epochs and other parameters for test mode
     num_epochs = 1 if test_mode else int(cfg.trainer.epochs)
     eval_steps = 10 if test_mode else 100
 
-    # Calculate a reasonable batch size based on sequence length
-    # Longer sequences need smaller batch sizes
-    adjusted_batch_size = max(
-        1, int(cfg.dataloader.max_batch_size * (512 / max_length))
-    )
-    LOGGER.info(
-        f"Using adjusted batch size: {adjusted_batch_size} (original: {cfg.dataloader.max_batch_size})"
-    )
+    # Generate a random run ID for output directory
+    run_id = "".join(random.choices(string.ascii_letters + string.digits, k=8))
+    final_model_dir = Path("models") / run_id
+    final_model_dir.mkdir(parents=True, exist_ok=True)
 
+    # Setup training arguments with memory optimizations
     training_args = TrainingArguments(
-        output_dir=str(output_dir),
+        output_dir=str(final_model_dir),
         learning_rate=float(cfg.optimizer.configs.lr),
-        per_device_train_batch_size=adjusted_batch_size,
-        per_device_eval_batch_size=adjusted_batch_size,
+        per_device_train_batch_size=cfg.dataloader.max_batch_size,
+        per_device_eval_batch_size=cfg.dataloader.max_batch_size,
         num_train_epochs=num_epochs,
-        weight_decay=float(cfg.optimizer.configs.weight_decay)
-        if hasattr(cfg.optimizer.configs, "weight_decay")
-        else 0.01,
         save_strategy="steps" if test_mode else "epoch",
-        evaluation_strategy="steps" if test_mode else "epoch",
+        eval_strategy="steps" if test_mode else "epoch",
         eval_steps=eval_steps,
-        logging_dir=str(output_dir / "logs"),
+        logging_dir=str(final_model_dir / "logs"),
         logging_steps=10 if test_mode else 100,
         load_best_model_at_end=True,
         metric_for_best_model="macro_f1",
         greater_is_better=True,
-        fp16=torch.cuda.is_available(),  # Use mixed precision
-        gradient_accumulation_steps=int(
-            cfg.dataloader.batch_size // adjusted_batch_size
-        ),
-        # Memory optimization flags
+        fp16=torch.cuda.is_available(),
         optim="adamw_torch_fused" if torch.cuda.is_available() else "adamw_torch",
-        dataloader_pin_memory=False,  # Reduces CPU memory usage
-        max_grad_norm=1.0,  # Help with stability
+        report_to=["wandb"],
+        run_name=run_id,
     )
 
     # Use the efficient DataCollator that does dynamic padding
@@ -294,13 +269,14 @@ def main(cfg: OmegaConf) -> None:
         tokenizer=tokenizer,
         padding="longest",
     )
-    # Initialize trainer with memory optimizations
+
+    # Initialize trainer
     trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=tokenized_dataset["train"],
         eval_dataset=tokenized_dataset["validation"],
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         data_collator=data_collator,
         compute_metrics=compute_metrics,
     )
@@ -311,23 +287,19 @@ def main(cfg: OmegaConf) -> None:
 
     # Evaluate on test set
     LOGGER.info("Evaluating on test set...")
-    results = trainer.evaluate(tokenized_dataset["test"])
-    LOGGER.info(f"Test results: {results}")
+    trainer.evaluate(tokenized_dataset["test"])
 
-    # Save model, tokenizer, and code mappings
-    LOGGER.info("Saving model...")
-    trainer.save_model(output_dir / "final_model")
-    tokenizer.save_pretrained(output_dir / "final_model")
+    # Save model, tokenizer, and code mappings to final location
+    LOGGER.info(f"Saving model to {final_model_dir}...")
+    trainer.save_model(final_model_dir)
+    tokenizer.save_pretrained(final_model_dir)
 
-    # Save code mappings for inference
-    import json
-
-    with open(output_dir / "final_model/code_to_idx.json", "w") as f:
+    with open(final_model_dir / "code_to_idx.json", "w") as f:
         json.dump(code_to_idx, f)
-    with open(output_dir / "final_model/idx_to_code.json", "w") as f:
+    with open(final_model_dir / "idx_to_code.json", "w") as f:
         json.dump({idx: code for code, idx in code_to_idx.items()}, f)
 
-    LOGGER.info(f"Training complete. Model saved to {output_dir / 'final_model'}")
+    LOGGER.info(f"Training complete. Model saved to {final_model_dir}")
 
 
 if __name__ == "__main__":
