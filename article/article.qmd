@@ -1,0 +1,130 @@
+---
+title: "Clinical Language Encoding with ModernBERT"
+format:
+  arxiv-pdf:
+    keep-tex: true  
+    linenumbers: false
+    doublespacing: false
+    runninghead: "A Preprint"
+  arxiv-html: default
+author:
+  - name: Tyler M Cross
+    affiliations:
+      - name: University of California, Berkeley School of Information 
+        department: Master's in Data Science
+        address: 102 South Hall
+        city: Berkeley, CA
+        country: USA
+        postal-code: 94720
+    orcid: 0009-0003-3529-8222
+    email: tyler.cross@berkeley.edu
+    url: https://tylercross.me
+  # - name: Someone Else
+  #   affiliations:
+  #     - name: State University of New York College of Environmental Science and Forestry
+  #       department: Department of Sustainable Resources Management
+  #       address: 1 Forestry Drive
+  #       city: Syracuse, NY
+  #       country: USA
+  #       postal-code: 13210
+abstract: |
+  Medical coding—assigning standardized codes to clinical documentation—is a costly, labor-intensive process. Automating this task via multi-label classification faces challenges like long documents and extreme class imbalance. We present CLEM-ICD, replacing the RoBERTa/BERT base models common in prior frameworks with ModernBERT, leveraging its 8192-token context window to better process lengthy clinical notes. ModernBERT's optimized architecture (~138M parameters) enhances computational efficiency and simplifies implementation compared to prior approaches requiring complex modifications for shorter-context models. Evaluating on the MDACE dataset, CLEM-ICD achieves a Micro-F1 score of 47.6%, outperforming recent results by @edin2024explainable (41.9% Micro-F1). On the standard MIMIC-III benchmark, CLEM-ICD achieves a notably high Macro-F1 of 16.5%, significantly outperforming the current state-of-the-art on uncommon classes. CLEM-ICD demonstrates how modern architectural advancements, particularly large context windows applied to encoder-only models, can yield strong performance on complex tasks like automated medical coding. We release our code and models to foster further research.
+keywords: 
+  - clinical natural language processing
+  - ModernBERT
+  - MIMIC-IV
+  - MIMIC-III
+  - MDACE
+  - multi-label classification
+bibliography: bibliography.bib  
+---
+
+# Introduction {#sec-intro}
+
+Medical coding, the assignment of standardized codes to clinical documentation, is an essential step for medical billing and reimbursement. The administrative processes surrounding billing and insurance-related activities, which heavily rely on accurate coding, represent a significant burden, consuming up to 25% of healthcare expenditures in the United States [@kocher2011rethinking; @tseng2018administrative]. Research has focused on attempts to automate coding by training multi-label classification models, with transformer-based architectures emerging as particularly effective [@huang-etal-2022-plm; @liu2023automated]. The PLM-ICD framework [@huang-etal-2022-plm], utilizing BERT-based language models to encode clinical documents, established a strong benchmark for automated ICD coding by effectively balancing model complexity and predictive accuracy on the MIMIC-III dataset [@johnson2016mimic].
+
+Despite advances, significant challenges persist in automated medical coding systems. Clinical documents often exceed the standard context windows (e.g., 512 tokens) of many transformer models, causing potential information loss during truncation or requiring complex workarounds like the segment pooling employed by PLM-ICD [@huang-etal-2022-plm]. Furthermore, the extreme class imbalance inherent in ICD coding hinders performance on rare but clinically significant codes. Although transformer-based approaches generally outperform older convolutional and recurrent architectures, these limitations highlight the need for architectures with natively expanded context windows, a capability offered by modern transformer variants like ModernBERT [@warner2024modernbert], which can process lengthy clinical documents more holistically.
+
+# Methods {#sec-methods}
+
+We followed the established data preparation pipeline developed by @cheng-etal-2023-mdace for processing the MIMIC-III and MIMIC-IV datasets [@johnson2023mimic], heavily relying on the open-source code provided by @edin2024explainable to match clinical visit notes with their associated diagnostic and procedure codes. Specifically, for the results compared against @edin2024explainable in @tbl-results, we utilized the MIMIC-III dataset [@johnson2016mimic], focusing on inpatient discharge summaries and their associated ICD-9 codes, processed according to the splits defined by @cheng-etal-2023-mdace. These notes originate from various clinicians across intensive care units at the Beth Israel Deaconess Medical Center. While previous approaches like PLM-ICD [@huang-etal-2022-plm] and its iterations employed specialized architectures for clinical text encoding, we diverged from this approach by adopting the more generic multi-label classification architecture recommended by ModernBERT [@warner2024modernbert]. This decision simplified the architecture, facilitating experimentation and fully leveraging ModernBERT's 8192-token context window.
+
+Training transformer models with such extended context windows presented significant computational challenges, particularly on consumer-grade hardware. To address memory constraints, we implemented a combination of gradient checkpointing during backpropagation and Flash Attention 2.0 [@dao2022flashattentionfastmemoryefficientexact]. These optimizations enabled us to train our models on a standard consumer GPU without degrading performance. To facilitate direct comparison with existing approaches, we attempted to maintain the same evaluation metrics employed by PLM-ICD and subsequent works [@huang-etal-2022-plm; @edin2024explainable; @liu2023automated], including micro and macro-averaged F1 scores, precision, and recall metrics, which represent the standard evaluation framework in this field.
+
+# Results {#sec-results}
+
+Our proposed CLEM-ICD model, leveraging the ModernBERT architecture with an 8192-token context window, was evaluated on the MDACE dataset using the standard multi-label classification metrics. The best performing model achieved a Micro-averaged F1 score (Micro-F1) of 0.476, Micro-Precision of 0.680, and Micro-Recall of 0.366 on the test set. The Macro-averaged F1 score (Macro-F1) reached 0.038.
+
+| Model                                 | Precision (%) | Recall (%) | Micro-F1 (%) |
+|---------------------------------------|---------------|------------|--------------|
+| AttInGrad (TM) [@edin2024explainable] | 40.2 $\pm$ 3.0  | 43.9 $\pm$ 4.8 | 41.9 $\pm$ 3.4 |
+| CLEM-ICD (Ours)                  | 68.0          | 36.6       | 47.6         |
+
+Table: Comparison of multi-label classification performance metrics between our CLEM-ICD model and the AttInGrad (TM) baseline from @edin2024explainable. {#tbl-results}
+
+These results demonstrate a notable improvement over recent benchmarks. For instance, comparing our Micro-F1 score of 47.6% to the 41.9% reported by @edin2024explainable for their AttInGrad model on the same MIMIC-III/MDACE benchmark dataset, our approach shows enhanced performance. A key difference is that the @edin2024explainable results are averaged over 10 runs, providing confidence intervals, whereas our CLEM-ICD results are based on a single training run due to computational constraints. Nevertheless, the CLEM-ICD model appears competitive with, and potentially surpasses, state-of-the-art methods like PLM-ICD [@huang-etal-2022-plm] under similar evaluation conditions, particularly benefiting from the extended context capacity. The low Macro-F1 score (3.8% on this dataset), however, aligns with observations in prior work, indicating persistent challenges in accurately classifying less frequent codes within the highly imbalanced ICD code distribution.
+
+To provide a direct comparison on the widely used MIMIC-III benchmark dataset [@johnson2016mimic], we evaluate CLEM-ICD against the original PLM-ICD [@huang-etal-2022-plm] and subsequent improvements reported by @liu2023automated. The results are summarized in @tbl-mimic3-comparison. Our CLEM-ICD model demonstrates a strong Macro-F1 score, suggesting better performance on less frequent codes compared to prior work, although the Micro-F1 score is lower in this specific run.
+
+| Model                     | Macro-F1 (%)   | Micro-F1 (%)   | P@5 (%)        | P@8 (%)        | P@15 (%)       |
+|---------------------------|----------------|----------------|----------------|----------------|----------------|
+| PLM-ICD [@huang-etal-2022-plm] | 10.4           | 59.8           | 84.4           | 77.1           | 61.3           |
+| BL-5 [@liu2023automated]   | 11.1 $\pm$ 0.1 | 60.7 $\pm$ 0.1 | 85.2 $\pm$ 0.2 | 78.0 $\pm$ 0.2 | 62.4 $\pm$ 0.1 |
+| CLEM-ICD (Ours)           | 16.5           | 54.6           | -              | -              | -              |
+: Comparison of results on the MIMIC-III full test set (%). CLEM-ICD results are from a single run. P@k metrics were not computed for CLEM-ICD in this run. {#tbl-mimic3-comparison}
+
+Note that while Macro-F1 and Micro-F1 scores are directly comparable, the P@k metrics reported by @huang-etal-2022-plm and @liu2023automated differ from the overall micro-averaged precision (65.6%) and recall (46.8%) metrics recorded for our CLEM-ICD run.
+
+::: {#fig-learning-curves-mdace layout-ncol="2" fig-cap="Learning curves for CLEM-ICD trained on MIMIC-III Inpatient Discharge Summaries (MDACE splits) for 10 epochs."}
+
+![Evaluation Recall (MDACE)](learning_curve_recall_mdace.png){#fig-recall-mdace}
+
+![Evaluation Precision (MDACE)](learning_curve_precision_mdace.png){#fig-precision-mdace}
+
+![Evaluation Macro-F1 Score (MDACE)](learning_curve_macro_f1_mdace.png){#fig-macro-f1-mdace}
+
+![Evaluation Micro-F1 Score (MDACE)](learning_curve_micro_f1_mdace.png){#fig-micro-f1-mdace}
+
+:::
+
+::: {#fig-learning-curves-full layout-ncol="2" fig-cap="Learning curves for CLEM-ICD trained on the full MIMIC-III dataset (PLM-ICD splits) for 20 epochs."}
+
+![Evaluation Recall (MIMIC-III Full)](learning_curve_recall_full.png){#fig-recall-full}
+
+![Evaluation Precision (MIMIC-III Full)](learning_curve_precision_full.png){#fig-precision-full}
+
+![Evaluation Macro-F1 Score (MIMIC-III Full)](learning_curve_macro_f1_full.png){#fig-macro-f1-full}
+
+![Evaluation Micro-F1 Score (MIMIC-III Full)](learning_curve_micro_f1_full.png){#fig-micro-f1-full}
+
+:::
+
+Observing the learning curves (@fig-learning-curves-mdace and @fig-learning-curves-full), the model trained on the full MIMIC-III dataset (@fig-learning-curves-full) appears to plateau relatively early in training, particularly for Micro-F1, while the model trained on the smaller MDACE split (@fig-learning-curves-mdace) shows more continued improvement later into the 10 epochs. Both runs exhibited signs of overfitting, suggesting that future training could benefit from implementing early stopping based on validation set performance.
+
+# Discussion
+
+## Architectural Considerations
+
+Our results underscore the advantage of leveraging transformer architectures with natively long context windows for processing lengthy clinical narratives in automated ICD coding. ModernBERT's 8192-token capacity allows CLEM-ICD to process entire documents holistically, potentially avoiding context fragmentation issues that can arise from the segment pooling techniques employed by prior work like PLM-ICD [@huang-etal-2022-plm] to handle shorter context limits. This architectural choice significantly simplifies the implementation, relying on standard Hugging Face library components (`AutoModelForSequenceClassification`) rather than requiring bespoke modules for segmentation or label-specific attention mechanisms, which were critical for PLM-ICD's performance. While this standard classification head might be considered less sophisticated than specialized approaches for extreme multi-label classification [@chang2019taming; @liu2023automated], the strong representational power of ModernBERT combined with its ability to access the full document context appears to compensate effectively for this task.
+
+## Base Model Choice and Efficiency
+
+The selection of ModernBERT-base [@warner2024modernbert] as the foundation model provides benefits beyond its extended context window. Incorporating architectural optimizations adapted from recent decoder-only models, ModernBERT-base (~138M parameters) is designed for improved computational efficiency, demonstrating enhanced inference speed compared to previous BERT-style encoders, particularly for variable-length inputs and long sequences due to its alternating attention mechanism [@warner2024modernbert]. This increased efficiency holds potential for deployment in settings with limited computational resources or for enabling faster processing of large clinical datasets. However, the base model utilized here underwent general-domain pretraining (including text, code, and scientific literature) without specific adaptation to clinical or biomedical language. Consequently, further performance improvements might be realized through future domain-specific adaptation, either via continued pretraining on clinical corpora or fine-tuning biomedically-specialized ModernBERT variants.
+
+## Performance Analysis and Limitations
+
+The effectiveness of this approach is reflected in the competitive results. CLEM-ICD achieves a superior Micro-F1 on the MDACE benchmark compared to AttInGrad [@edin2024explainable] and demonstrates a markedly improved Macro-F1 score on the full MIMIC-III dataset compared to both PLM-ICD [@huang-etal-2022-plm] and the more recent BL-5 model [@liu2023automated]. This strong Macro-F1 performance suggests that the model's access to the full, unsegmented context and potentially the broader knowledge within ModernBERT's pretraining data aids significantly in classifying less frequent codes, a persistent challenge in this domain. This capability is particularly relevant for developing coder assistance tools, as human coders often need more support with rare codes than common ones.
+
+However, the lower Micro-F1 score on the full MIMIC-III dataset compared to these benchmarks warrants consideration. This could be partly attributed to factors like variance from a single training run or differences in fine-tuning hyperparameters compared to the more established benchmarks. The learning curves also indicated potential overfitting (@fig-learning-curves-mdace, @fig-learning-curves-full), a known challenge when fine-tuning large language models [@dodge2020finetuning], suggesting that incorporating regularization techniques like early stopping is crucial. Furthermore, this study deliberately focused on classification performance. Consequently, it does not incorporate methods for enhancing model interpretability, such as identifying supporting text spans [@cheng-etal-2023-mdace] or visualizing attention patterns [@vaswani2017attention; @edin2024explainable], which remain important avenues for clinical NLP research.
+
+# Conclusion
+
+In this work, we presented CLEM-ICD, an automated ICD coding framework leveraging the ModernBERT architecture. By utilizing ModernBERT's native 8192-token context window, CLEM-ICD processes lengthy clinical documents effectively with a simplified architecture compared to previous methods like PLM-ICD that required complex segmentation or attention mechanisms. Our experiments demonstrate the potential of this approach, achieving competitive performance on the MDACE benchmark and notably strong Macro-F1 scores on the full MIMIC-III dataset, indicating improved classification of less frequent codes. This work highlights the promise of efficient, long-context encoder models for tackling the challenges of automated medical coding. To support reproducibility and further research, we release all code and model weights publicly.[^code]
+
+## Future Work
+
+Future research should focus on refining the fine-tuning process for large-context models in this domain. Implementing robust early stopping based on validation performance is a clear next step. Further investigation into techniques specifically addressing the long-tail distribution of ICD codes is warranted, including exploring specialized loss functions or hierarchical classification strategies [@liu2023automated]. Evaluating the efficacy of parameter-efficient fine-tuning (PEFT) methods, such as LoRA [@hu2021lora], could also improve computational feasibility and potentially mitigate overfitting. The public release of our code and model weights aims to facilitate such investigations and contribute to the broader goal of developing robust, efficient, and potentially more interpretable automated medical coding systems.
+
+[^code]: Code and models available at \url{https://github.com/tylermarcuscross/explainable-medical-coding}
+
+# References

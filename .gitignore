@@ -99,7 +99,6 @@ multirun/
 
 models/modernbert-base
 
-article/
 validation.ipynb
 
 models/

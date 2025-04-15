@@ -234,7 +234,7 @@ def main(cfg: OmegaConf) -> None:
         num_labels=len(all_codes),
     )
 
-    # Enable gradient checkpointing to save memory (significant memory reduction)
+    # Enable gradient checkpointing to save memor
     model.gradient_checkpointing_enable()
     # Adjust epochs and other parameters for test mode
     num_epochs = 1 if test_mode else int(cfg.trainer.epochs)
