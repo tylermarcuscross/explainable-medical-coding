@@ -32,7 +32,6 @@ abstract: |
 keywords: 
   - clinical natural language processing
   - ModernBERT
-  - MIMIC-IV
   - MIMIC-III
   - MDACE
   - multi-label classification
