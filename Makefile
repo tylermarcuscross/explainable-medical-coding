@@ -56,6 +56,13 @@ download_models:
 	tar -xvzf models/temp.tar.gz
 	rm models/temp.tar.gz
 
+download_modernbert:
+	poetry run python -c "from transformers import AutoModel, AutoTokenizer; \
+		model = AutoModel.from_pretrained('answerdotai/ModernBERT-base'); \
+		tokenizer = AutoTokenizer.from_pretrained('answerdotai/ModernBERT-base'); \
+		model.save_pretrained('$(PROJECT_DIR)/models/modernbert-base'); \
+		tokenizer.save_pretrained('$(PROJECT_DIR)/models/modernbert-base')"
+
 prepare_everything:
 	make setup
 	make mimiciv
